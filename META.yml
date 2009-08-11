@@ -20,10 +20,11 @@ no_index:
     - inc
     - t
 requires:
-  AnyEvent: 4.87
+  AnyEvent: 4.82
   Mail::Address: 0
   Object::Event: 1.0
   Sys::Hostname: 0
+  common::sense: 0
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.02
+version: 0.03
