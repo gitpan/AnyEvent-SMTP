@@ -52,6 +52,15 @@ our %CMD = map { $_ => 1 } qw( HELO EHLO MAIL RCPT QUIT DATA EXPN VRFY NOOP HELP
             my ($m,$addr) = @_;
             if ($good) { return 1 } else { return 0, 513, 'Bad recipient.' }
         },
+        data_validate => sub {
+            my ($m,$data) = @_;
+            my $size = length $data;
+            if ($size > $max_email_size) {
+                return 0, 552, 'REJECTED: message size limit exceeded';
+            } else {
+                return 1;
+            }
+        },
     );
 
     $server->reg_cb(
@@ -65,7 +74,7 @@ our %CMD = map { $_ => 1 } qw( HELO EHLO MAIL RCPT QUIT DATA EXPN VRFY NOOP HELP
         },
         mail => sub {
             my ($s,$mail) = @_;
-            warn "Received mail from $mail->{from} to $mail->{to}\n$mail->{data}\n";
+            warn "Received mail from ($mail->{host}:$mail->{port}) $mail->{from} to $mail->{to}\n$mail->{data}\n";
         },
     );
 
@@ -252,8 +261,13 @@ sub new {
 			my $from = join ' ',@args;
 			$from =~ s{^from:}{}i or return $con->reply('501 Usage: MAIL FROM:<mail addr>');
 			$con->{helo} or return $con->reply("503 Error: send HELO/EHLO first");
-			my @addrs = map { $_->address } Mail::Address->parse($from);
-			@addrs == 1 or return $con->reply('501 Usage: MAIL FROM:<mail addr>');
+			my @addrs;
+			if ($from !~ /^\s*<>\s*$/) {
+				@addrs = map { $_->address } Mail::Address->parse($from);
+				@addrs == 1 or return $con->reply('501 Usage: MAIL FROM:<mail addr>');
+			} else {
+				@addrs = ('');
+			}
 			if ($self->{mail_validate}) {
 				my ($res,$err,$errstr) = $self->{mail_validate}->($con->{m}, $addrs[0]);
 				$res or return $con->reply("$err $errstr");
@@ -281,7 +295,12 @@ sub new {
 			$con->{m}{to}   or return $con->reply("554 Error: need RCPT command");
 			$con->reply("354 End data with <CR><LF>.<CR><LF>");
 			$con->data(cb => sub {
-				$con->{m}{data} = shift;
+				my $data = shift;
+				if ($self->{data_validate}) {
+					my ($res,$err,$errstr) = $self->{data_validate}->($con->{m}, $data);
+					$res or return $con->reply("$err $errstr");
+				}
+				$con->{m}{data} = $data;
 				local $s->{event_failed} = 0;
 				local $s->{current_con} = $con;
 				$s->event( mail => delete $con->{m} );
@@ -329,7 +348,7 @@ sub start {
 		$self->accept_connection(@_);
 	}, sub {
 		my ($sock,$host,$port) = @_;
-		$self->{sock} = $sock;
+		#$self->{sock} = $sock;
 		$self->{host} = $host unless defined $self->{host};
 		$self->{port} = $port unless defined $self->{port};
 		warn "Server started on port $self->{port}\n" if $self->{debug};

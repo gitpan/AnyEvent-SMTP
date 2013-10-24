@@ -24,7 +24,6 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
-MYMETA.yml
 README
 t/00-load.t
 t/30-server-func.t
@@ -34,6 +33,6 @@ t/50-slots-maxcon.t
 t/51-slots-maxcon-host.t
 t/52-slots-maxcon-unlim.t
 t/53-slots-active.t
+t/54-stop-listening.t
 t/pod-coverage.t
 t/pod.t
-xt/99-dist.t
